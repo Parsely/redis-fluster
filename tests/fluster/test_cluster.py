@@ -71,3 +71,17 @@ class FlusterClusterTests(unittest2.TestCase):
             else:
                 self.assertItemsEqual(res, [None, None, '3'])
 
+    def test_consistent_hashing(self):
+        key = 'foo'  # 2 with 3 clients, 0 with 2
+        client = self.cluster.get_client(key)
+        self.instances[0].terminate()
+        try:
+            self.assertRaises(
+                ConnectionError,
+                lambda: self.cluster.get_client(self.keys[0]).incr('hi', 1)
+            )
+            client_2 = self.cluster.get_client(key)
+            self.assertEqual(client, client_2)
+        finally:
+            # Bring it back up
+            self.instances[0] = RedisInstance(10101)

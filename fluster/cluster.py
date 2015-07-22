@@ -35,12 +35,13 @@ class FlusterCluster(object):
         self.penalty_box = PenaltyBox(min_wait=penalty_box_min_wait,
                                       max_wait=penalty_box_max_wait,
                                       multiplier=penalty_box_wait_multiplier)
-        self.clients = self._prep_clients(clients)
+        self.active_clients = self._prep_clients(clients)
+        self.initial_clients = {c.pool_id: c for c in clients}
         self._sort_clients()
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
-        self.clients.sort(key=lambda c: c.pool_id)
+        self.active_clients.sort(key=lambda c: c.pool_id)
 
     def _prep_clients(self, clients):
         """Prep a client by tagging it with and id and wrapping methods.
@@ -71,9 +72,9 @@ class FlusterCluster(object):
                 try:
                     return fn(*args, **kwargs)
                 except ConnectionError:  # TO THE PENALTY BOX!
-                    if client in self.clients:  # hasn't been removed yet
+                    if client in self.active_clients:  # hasn't been removed yet
                         log.warning('%r marked down.', client)
-                        self.clients.remove(client)
+                        self.active_clients.remove(client)
                         self.penalty_box.add(client)
                     raise
             return functools.update_wrapper(wrapper, fn)
@@ -98,13 +99,24 @@ class FlusterCluster(object):
         """
         added = False
         for client in self.penalty_box.get():
-            self.clients.append(client)
+            self.active_clients.append(client)
             added = True
         if added:
             self._sort_clients()
 
-        if len(self.clients) == 0:
+        if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
 
-        pos = mmh3.hash(shard_key) % len(self.clients)
-        return self.clients[pos]
+        # So that hashing is consistent when a node is down, check against
+        # the initial client list. Only use the active client list when
+        # the desired node is down.
+        # N.B.: I know this is not technically "consistent hashing" as
+        #       academically defined. It's a hack so that keys which need to
+        #       go elsewhere do, while the rest stay on the same instance.
+        hashed = mmh3.hash(shard_key)
+        pos = hashed % len(self.initial_clients)
+        if self.initial_clients[pos] in self.active_clients:
+            return self.initial_clients[pos]
+        else:
+            pos = hashed % len(self.active_clients)
+            return self.active_clients[pos]
