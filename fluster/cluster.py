@@ -99,6 +99,7 @@ class FlusterCluster(object):
         """
         added = False
         for client in self.penalty_box.get():
+            log.info('Client %r is back up.', client)
             self.active_clients.append(client)
             added = True
         if added:
