@@ -1,3 +1,4 @@
+from collections import defaultdict
 import functools
 import logging
 
@@ -121,3 +122,28 @@ class FlusterCluster(object):
         else:
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
+
+    def zrevrange_with_int_score(self, key, max_score, min_score):
+        """Get the zrevrangebyscore across the cluster.
+        Highest score for duplicate element is returned.
+        A faster method should be written if scores are not needed.
+        """
+        if len(self.active_clients) == 0:
+            raise ClusterEmptyError('All clients are down.')
+
+        element__score = defaultdict(int)
+        for client in self.active_clients:
+            revrange = client.zrevrangebyscore(
+                key, max_score, min_score,
+                withscores=True,
+                score_cast_func=int,
+            )
+            print 'revrange for', client
+            print revrange
+
+            for element, count in revrange:
+                element__score[element] = max(element__score[element], int(count))
+
+            print element__score
+
+        return element__score

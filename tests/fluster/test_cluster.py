@@ -85,3 +85,42 @@ class FlusterClusterTests(unittest2.TestCase):
         finally:
             # Bring it back up
             self.instances[0] = RedisInstance(10101)
+
+    def test_zrevrange(self):
+        """Add a sorted set, turn off the client, add to the set,
+        turn the client back on, check results
+        """
+        key = 'foo'
+        for element, count in zip(self.keys, (1.0, 2.0, 3.0)):
+            client = self.cluster.get_client(element)
+            client.zadd(key, count, element)
+        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
+        self.assertEqual(set([3,2]), set(revrange.values()))
+
+        lost_client = self.cluster.get_client(self.keys[-1])
+        self.instances[-1].terminate()
+
+        dropped_element = self.keys[-1]
+        new_count = 5
+        client = self.cluster.get_client(dropped_element)
+        try:
+            client.zadd(key, new_count, dropped_element)
+            raise Exception("Should not get here, client was terminated")
+        except ConnectionError:
+            client = self.cluster.get_client(dropped_element)
+            print 'replaced client', client
+            client.zadd(key, new_count, dropped_element)
+        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
+        self.assertEqual(set([new_count,2]), set(revrange.values()))
+
+        #turn it back on
+        self.instances[-1] = RedisInstance(10103)
+        time.sleep(0.5)
+
+        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
+        self.assertEqual(set([new_count,2]), set(revrange.values())) #restarted instance is empty in this case
+
+        client = self.cluster.get_client(dropped_element)
+        client.zadd(key, 3, dropped_element) #put original value back in
+        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
+        self.assertEqual(set([new_count,2]), set(revrange.values())) #max value found for duplicates is returned
