@@ -138,12 +138,8 @@ class FlusterCluster(object):
                 withscores=True,
                 score_cast_func=int,
             )
-            print 'revrange for', client
-            print revrange
 
             for element, count in revrange:
                 element__score[element] = max(element__score[element], int(count))
-
-            print element__score
 
         return element__score
