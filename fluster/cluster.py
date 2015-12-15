@@ -115,6 +115,8 @@ class FlusterCluster(object):
         # N.B.: I know this is not technically "consistent hashing" as
         #       academically defined. It's a hack so that keys which need to
         #       go elsewhere do, while the rest stay on the same instance.
+        if not isinstance(shard_key, bytes):
+            shard_key = shard_key.encode('utf-8')
         hashed = mmh3.hash(shard_key)
         pos = hashed % len(self.initial_clients)
         if self.initial_clients[pos] in self.active_clients:
