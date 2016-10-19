@@ -1,12 +1,15 @@
-import time
+from __future__ import absolute_import, print_function
 
-import unittest2
+import time
+import unittest
+
 from redis.exceptions import ConnectionError
 from testinstances import RedisInstance
 
 from fluster import FlusterCluster
 
-class FlusterClusterTests(unittest2.TestCase):
+
+class FlusterClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
@@ -21,7 +24,7 @@ class FlusterClusterTests(unittest2.TestCase):
 
     def setUp(self):
         self.cluster = FlusterCluster([i.conn for i in self.instances],
-                                       penalty_box_min_wait=0.5)
+                                      penalty_box_min_wait=0.5)
         self.keys = ['hi', 'redis', 'test']  # hashes to 3 separate values
 
     def tearDown(self):
@@ -50,8 +53,8 @@ class FlusterClusterTests(unittest2.TestCase):
                 self.cluster.get_client(key).incr(key, 1)
             except ConnectionError:
                 changed = key
-                cl = self.cluster.get_client(key)
-                cl.incr(key, 1)
+                client = self.cluster.get_client(key)
+                client.incr(key, 1)
 
         # Restart instance
         self.instances[0] = RedisInstance(10101)
@@ -67,9 +70,9 @@ class FlusterClusterTests(unittest2.TestCase):
             # Check values in all running instances
             res = [i.conn.get(key) for i in self.instances]
             if key == changed:
-                self.assertItemsEqual(res, [None, '1', '1'])
+                self.assertCountEqual(res, [None, b'1', b'1'])
             else:
-                self.assertItemsEqual(res, [None, None, '3'])
+                self.assertCountEqual(res, [None, None, b'3'])
 
     def test_consistent_hashing(self):
         key = 'foo'  # 2 with 3 clients, 0 with 2
@@ -95,7 +98,7 @@ class FlusterClusterTests(unittest2.TestCase):
             client = self.cluster.get_client(element)
             client.zadd(key, count, element)
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
-        self.assertEqual(set([3,2]), set(revrange.values()))
+        self.assertEqual(set([3, 2]), set(revrange.values()))
 
         lost_client = self.cluster.get_client(self.keys[-1])
         self.instances[-1].terminate()
@@ -108,19 +111,19 @@ class FlusterClusterTests(unittest2.TestCase):
             raise Exception("Should not get here, client was terminated")
         except ConnectionError:
             client = self.cluster.get_client(dropped_element)
-            print 'replaced client', client
+            print('replaced client', client)
             client.zadd(key, new_count, dropped_element)
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
-        self.assertEqual(set([new_count,2]), set(revrange.values()))
+        self.assertEqual(set([new_count, 2]), set(revrange.values()))
 
         #turn it back on
         self.instances[-1] = RedisInstance(10103)
         time.sleep(0.5)
 
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
-        self.assertEqual(set([new_count,2]), set(revrange.values())) #restarted instance is empty in this case
+        self.assertEqual(set([new_count, 2]), set(revrange.values())) #restarted instance is empty in this case
 
         client = self.cluster.get_client(dropped_element)
         client.zadd(key, 3, dropped_element) #put original value back in
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
-        self.assertEqual(set([new_count,2]), set(revrange.values())) #max value found for duplicates is returned
+        self.assertEqual(set([new_count, 2]), set(revrange.values())) #max value found for duplicates is returned

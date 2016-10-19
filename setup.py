@@ -35,7 +35,7 @@ lint_requires = [
     'pyflakes'
 ]
 
-tests_require = ['mock', 'pytest', 'unittest2', 'testinstances']
+tests_require = ['mock', 'pytest', 'testinstances']
 dependency_links = []
 setup_requires = ['pytest-runner']
 

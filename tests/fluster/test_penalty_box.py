@@ -1,5 +1,5 @@
 import time
-import unittest2
+import unittest
 
 import mock
 from redis.exceptions import ConnectionError
@@ -7,7 +7,7 @@ from redis.exceptions import ConnectionError
 from fluster.penalty_box import PenaltyBox
 
 
-class PenaltyBoxTests(unittest2.TestCase):
+class PenaltyBoxTests(unittest.TestCase):
 
     def setUp(self):
         self.box = PenaltyBox(min_wait=0.5, max_wait=2)
@@ -48,4 +48,4 @@ class PenaltyBoxTests(unittest2.TestCase):
 
 
 if __name__ == '__main__':
-    unittest2.main()
+    unittest.main()
