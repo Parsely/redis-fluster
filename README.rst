@@ -8,7 +8,8 @@ Overview
 
 Redis Fluster is a very limited Redis pool/cluster implementation that makes sharding simple for a few common use cases.
 
-### Quickstart
+Quickstart
+^^^^^^^^^^
 
 .. code-block:: python
   import redis
