@@ -43,7 +43,7 @@ setup(
     name='fluster',
     version=get_version(),
     author='Keith Bourgoin',
-    author_email='keith at parsely dot com',
+    author_email='hello@parsely.com',
     url='https://github.com/Parsely/redis-fluster',
     description='Redis Cluster with Some Features',
     keywords='redis cluster',
