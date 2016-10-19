@@ -9,23 +9,23 @@ Overview
 Redis Fluster is a very limited Redis pool/cluster implementation that makes sharding simple for a few common use cases.
 
 ### Quickstart
-```python
-import redis
-from fluster import FlusterCluster
-cluster = FlusterCluster([redis.Redis(6379), redis.Redis(6380)])
 
-while True:
-  for key in ('foo', 'bar'):
-    try:
-      client = cluster.get_client(key)
-      client.incr(key, 1)
-      client.get(key)
-    except ConnectionError:
-      client = cluster.get_client(key)
-      client.incr(key, 1)
-      client.get(key)
-  time.sleep(1)
-```
+.. code-block:: python
+  import redis
+  from fluster import FlusterCluster
+  cluster = FlusterCluster([redis.Redis(6379), redis.Redis(6380)])
+
+  while True:
+    for key in ('foo', 'bar'):
+      try:
+        client = cluster.get_client(key)
+        client.incr(key, 1)
+        client.get(key)
+      except ConnectionError:
+        client = cluster.get_client(key)
+        client.incr(key, 1)
+        client.get(key)
+    time.sleep(1)
 
 
 Limited, how? I want to use this for everything!

@@ -2,3 +2,4 @@ recursive-include fluster *
 include *.rst
 include *.md
 include *.txt
+LICENSE
