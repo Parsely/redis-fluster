@@ -24,19 +24,19 @@ def get_version():
         return re.search(r"""__version__\s+=\s+(['"])(?P<version>.+?)\1""",
                          version_file.read()).group('version')
 
+
+def readme():
+    ''' Returns README.rst contents as str '''
+    with open('README.rst') as f:
+        return f.read()
+
+
 install_requires = [
     'mmh3',
     'redis',
     'hiredis',
 ]
-
-lint_requires = [
-    'pep8',
-    'pyflakes'
-]
-
 tests_require = ['mock', 'pytest', 'testinstances']
-dependency_links = []
 setup_requires = ['pytest-runner']
 
 setup(
@@ -46,19 +46,13 @@ setup(
     author_email='hello@parsely.com',
     url='https://github.com/Parsely/redis-fluster',
     description='Redis Cluster with Some Features',
+    long_description=readme(),
     keywords='redis cluster',
     license='Apache License 2.0',
     packages=find_packages(),
     install_requires=install_requires,
     tests_require=tests_require,
     setup_requires=setup_requires,
-    extras_require={
-        'test': tests_require,
-        'all': install_requires + tests_require,
-        'docs': ['sphinx'] + tests_require,
-        'lint': lint_requires
-    },
-    dependency_links=dependency_links,
     zip_safe=True,
     include_package_data=True,
     classifiers=[
