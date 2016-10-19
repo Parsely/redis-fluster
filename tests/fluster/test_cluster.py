@@ -2,6 +2,7 @@ from __future__ import absolute_import, print_function
 
 import time
 import unittest
+import sys
 
 from redis.exceptions import ConnectionError
 from testinstances import RedisInstance
@@ -10,6 +11,12 @@ from fluster import FlusterCluster
 
 
 class FlusterClusterTests(unittest.TestCase):
+
+    def assertCountEqual(self, a, b):
+        if sys.version_info > (3, 0):
+            super(FlusterClusterTests, self).assertCountEqual(a, b)
+        else:
+            self.assertItemsEqual(a, b)
 
     @classmethod
     def setUpClass(cls):
