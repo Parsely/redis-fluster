@@ -1,0 +1,5 @@
+mock
+pytest>=2.8.5
+coverage
+testinstances
+

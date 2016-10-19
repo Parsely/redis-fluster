@@ -15,7 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 """
 import re
-import sys
 
 from setuptools import setup, find_packages
 
@@ -36,14 +35,12 @@ lint_requires = [
     'pyflakes'
 ]
 
-tests_require = ['mock', 'nose', 'unittest2', 'testinstances']
+tests_require = ['mock', 'pytest', 'unittest2', 'testinstances']
 dependency_links = []
-setup_requires = []
-if 'nosetests' in sys.argv[1:]:
-    setup_requires.append('nose')
+setup_requires = ['pytest-runner']
 
 setup(
-    name='redis-fluster',
+    name='fluster',
     version=get_version(),
     author='Keith Bourgoin',
     author_email='keith at parsely dot com',
@@ -63,7 +60,6 @@ setup(
     },
     dependency_links=dependency_links,
     zip_safe=True,
-    test_suite='nose.collector',
     include_package_data=True,
     classifiers=[
             "Development Status :: 5 - Production/Stable",
