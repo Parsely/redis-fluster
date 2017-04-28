@@ -6,7 +6,7 @@ sudo: false
 
 python:
   - '2.7'
-  - '3.5'
+  - '3.6'
 
 notifications:
   flowdock: af7fd22c31cc718489c70b625d90b949
