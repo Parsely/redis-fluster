@@ -4,7 +4,7 @@ import logging
 
 import mmh3
 import redis
-from redis.exceptions import ConnectionError
+from redis.exceptions import ConnectionError, TimeoutError
 
 from .exceptions import ClusterEmptyError
 from .penalty_box import PenaltyBox
@@ -72,7 +72,7 @@ class FlusterCluster(object):
                 """Simple wrapper for to catch dead clients."""
                 try:
                     return fn(*args, **kwargs)
-                except ConnectionError:  # TO THE PENALTY BOX!
+                except (ConnectionError, TimeoutError):  # TO THE PENALTY BOX!
                     if client in self.active_clients:  # hasn't been removed yet
                         log.warning('%r marked down.', client)
                         self.active_clients.remove(client)

@@ -2,7 +2,7 @@ import heapq
 import logging
 import time
 
-from redis.exceptions import ConnectionError
+from redis.exceptions import ConnectionError, TimeoutError
 
 
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ class PenaltyBox(object):
                 client.echo('test')  # reconnected if this succeeds.
                 self._client_ids.remove(client.pool_id)
                 yield client
-            except ConnectionError:
+            except (ConnectionError, TimeoutError):
                 wait = min(int(last_wait * self._multiplier), self._max_wait)
                 heapq.heappush(self._clients,
                                (time.time() + wait, (client, wait)))
