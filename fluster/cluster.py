@@ -73,10 +73,7 @@ class FlusterCluster(object):
                 try:
                     return fn(*args, **kwargs)
                 except (ConnectionError, TimeoutError):  # TO THE PENALTY BOX!
-                    if client in self.active_clients:  # hasn't been removed yet
-                        log.warning('%r marked down.', client)
-                        self.active_clients.remove(client)
-                        self.penalty_box.add(client)
+                    self.penalize_client(client)
                     raise
             return functools.update_wrapper(wrapper, fn)
 
@@ -124,6 +121,26 @@ class FlusterCluster(object):
         else:
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
+
+    def penalize_client(self, client):
+        """Place client in the penalty box manually.
+
+        Useful for situations where clients are used via dependency injection, and
+        the methods cannot be wrapped safely to penalize automatically.
+
+        n.b. the `get_client` method is the mechanism used to periodically check
+        the penalized clients to see if any are ready again. If your code is manually
+        penalizing clients, make sure it utilizes the `get_client` method to
+        refresh the penalty box as well.
+
+        :param client: Client object
+        """
+        if client in self.active_clients:  # hasn't been removed yet
+            log.warning('%r marked down.', client)
+            self.active_clients.remove(client)
+            self.penalty_box.add(client)
+        else:
+            log.info("%r not in active client list.")
 
     def zrevrange_with_int_score(self, key, max_score, min_score):
         """Get the zrevrangebyscore across the cluster.
