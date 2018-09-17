@@ -92,11 +92,10 @@ class FlusterCluster(object):
             log.debug('Wrapping %s', name)
             setattr(client, name, wrap(obj))
 
-    def get_client(self, shard_key):
-        """Get the client for a given shard, based on what's available.
+    def _prune_penalty_box(self):
+        """Restores clients that have reconnected.
 
-        If the proper client isn't available, the next available client
-        is returned. If no clients are available, an exception is raised.
+        This function should be called first for every public method.
         """
         added = False
         for client in self.penalty_box.get():
@@ -105,6 +104,14 @@ class FlusterCluster(object):
             added = True
         if added:
             self._sort_clients()
+
+    def get_client(self, shard_key):
+        """Get the client for a given shard, based on what's available.
+
+        If the proper client isn't available, the next available client
+        is returned. If no clients are available, an exception is raised.
+        """
+        self._prune_penalty_box()
 
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
@@ -140,14 +147,7 @@ class FlusterCluster(object):
             print("Making a cycle for this requester")
             self._requesters[requester] = cycle(self.initial_clients.values())
 
-        # penalty box maintenance
-        added = False
-        for client in self.penalty_box.get():
-            log.info('Client %r is back up.', client)
-            self.active_clients.append(client)
-            added = True
-        if added:
-            self._sort_clients()
+        self._prune_penalty_box()
 
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
