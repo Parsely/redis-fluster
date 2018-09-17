@@ -76,7 +76,7 @@ class FlusterCluster(object):
                 try:
                     return fn(*args, **kwargs)
                 except (ConnectionError, TimeoutError):  # TO THE PENALTY BOX!
-                    self.penalize_client(client)
+                    self._penalize_client(client)
                     raise
             return functools.update_wrapper(wrapper, fn)
 
@@ -165,16 +165,8 @@ class FlusterCluster(object):
             if next_client in self.active_clients:
                 yield next_client
 
-    def penalize_client(self, client):
-        """Place client in the penalty box manually.
-
-        Useful for situations where clients are used via dependency injection, and
-        the methods cannot be wrapped safely to penalize automatically.
-
-        n.b. the `get_client` method is the mechanism used to periodically check
-        the penalized clients to see if any are ready again. If your code is manually
-        penalizing clients, make sure it utilizes the `get_client` method to
-        refresh the penalty box as well.
+    def _penalize_client(self, client):
+        """Place client in the penalty box.
 
         :param client: Client object
         """
@@ -190,6 +182,8 @@ class FlusterCluster(object):
         Highest score for duplicate element is returned.
         A faster method should be written if scores are not needed.
         """
+        self._prune_penalty_box()
+
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
 
