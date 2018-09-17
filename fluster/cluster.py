@@ -40,8 +40,8 @@ class FlusterCluster(object):
         self.active_clients = self._prep_clients(clients)
         self.initial_clients = {c.pool_id: c for c in clients}
         self._sort_clients()
-        # maintain cycle trackers
-        self._requesters = {}
+        # maintain separate cycle trackers for each requester
+        self._requester_cycles = {}
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
@@ -133,27 +133,23 @@ class FlusterCluster(object):
             return self.active_clients[pos]
 
     def get_client_cycle(self, requester, cycles=1):
-        """Yield clients, maintaining a pointer to the last used client for each requester.
+        """Yield clients, maintaining separate cycles for each requester.
 
-        Will not generate the same client more than `cycles` times per use of the function.
-
-        Also handles down nodes.
+        Will not generate the same client more than `cycles` times,
+        per use of the function. Also handles down nodes.
 
         :param requester: Hashable key for each requesting object.
         :param cycles: Max times to return each client per call.
         """
-        if requester not in self._requesters:
-            # create a cycle for it
-            print("Making a cycle for this requester")
-            self._requesters[requester] = cycle(self.initial_clients.values())
+        if requester not in self._requester_cycles:
+            self._requester_cycles[requester] = cycle(self.initial_clients.values())
 
         self._prune_penalty_box()
 
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
 
-        # yield clients if they are in the active clients list
-        conn_cycle = self._requesters[requester]
+        conn_cycle = self._requester_cycles[requester]
         placemarker = None
         rounds = 0
         for next_client in conn_cycle:
@@ -168,7 +164,6 @@ class FlusterCluster(object):
 
             if next_client in self.active_clients:
                 yield next_client
-
 
     def penalize_client(self, client):
         """Place client in the penalty box manually.
