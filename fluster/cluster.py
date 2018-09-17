@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import cycle
 import functools
 import logging
 
@@ -39,6 +40,8 @@ class FlusterCluster(object):
         self.active_clients = self._prep_clients(clients)
         self.initial_clients = {c.pool_id: c for c in clients}
         self._sort_clients()
+        # maintain cycle trackers
+        self._requesters = {}
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
@@ -121,6 +124,51 @@ class FlusterCluster(object):
         else:
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
+
+    def get_client_cycle(self, requester, cycles=1):
+        """Yield clients, maintaining a pointer to the last used client for each requester.
+
+        Will not generate the same client more than `cycles` times per use of the function.
+
+        Also handles down nodes.
+
+        :param requester: Hashable key for each requesting object.
+        :param cycles: Max times to return each client per call.
+        """
+        if requester not in self._requesters:
+            # create a cycle for it
+            print("Making a cycle for this requester")
+            self._requesters[requester] = cycle(self.initial_clients.values())
+
+        # penalty box maintenance
+        added = False
+        for client in self.penalty_box.get():
+            log.info('Client %r is back up.', client)
+            self.active_clients.append(client)
+            added = True
+        if added:
+            self._sort_clients()
+
+        if len(self.active_clients) == 0:
+            raise ClusterEmptyError('All clients are down.')
+
+        # yield clients if they are in the active clients list
+        conn_cycle = self._requesters[requester]
+        placemarker = None
+        rounds = 0
+        for next_client in conn_cycle:
+            # either we've just started, or we completed a cycle
+            if not placemarker:
+                placemarker = next_client
+            elif next_client == placemarker:
+                rounds += 1
+
+            if rounds >= cycles:
+                raise StopIteration
+
+            if next_client in self.active_clients:
+                yield next_client
+
 
     def penalize_client(self, client):
         """Place client in the penalty box manually.
