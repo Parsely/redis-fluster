@@ -17,15 +17,15 @@ class ActiveClientCycle(object):
         self.round_limit = rounds
         self.clients = cycle(cluster.initial_clients.values())
 
-        # initialize pointers and trackers
-        self.current_client = None
+        self._init_round_trackers()
+
+    def _init_round_trackers(self):
         self.round_start = None
         self.rounds_completed = 0
 
     def __iter__(self):
         """Restarts the `rounds` tracker, and updates active clients."""
-        self.round_start = None
-        self.rounds_completed = 0
+        self._init_round_trackers()
         self.cluster._prune_penalty_box()
 
         return self
