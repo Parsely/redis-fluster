@@ -29,12 +29,13 @@ class ActiveClientCycle(object):
 
         self.cluster._prune_penalty_box()  # XX TODO make public
 
-        if len(self.cluster.active_clients) == 0:
-            raise ClusterEmptyError('All clients are down.')
-
         return self
 
     def __next__(self):
+        """Always returns a client, or raises an Exception if none are available."""
+        if len(self.cluster.active_clients) == 0:
+            raise ClusterEmptyError('All clients are down.')
+
         nxt = None
         while nxt is None:
             nxt = self._next_helper()

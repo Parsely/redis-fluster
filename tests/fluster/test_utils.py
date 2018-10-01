@@ -5,7 +5,7 @@ import sys
 
 from testinstances import RedisInstance
 
-from fluster import FlusterCluster
+from fluster import FlusterCluster, ClusterEmptyError
 
 
 class FlusterClusterTests(unittest.TestCase):
@@ -97,3 +97,30 @@ class FlusterClusterTests(unittest.TestCase):
 
         # should not start at the same point
         assert next(active_cycle_1) != next(active_cycle_2)
+
+    def test_dropped_connections_while_iterating(self):
+        # dropped connections in the middle of an iteration should not cause an infinite loop
+        # and should raise an exception
+        active_cycle = self.cluster.get_active_client_cycle(rounds=7)
+
+        assert len(self.cluster.active_clients) == 3
+
+        drop_at_idx = (5, 6, 7)  # at these points, kill a connection
+        killed = 0
+        with self.assertRaises(ClusterEmptyError) as context:
+            for idx, client in enumerate(active_cycle):
+                if idx in drop_at_idx:
+                    self.instances[killed].terminate()
+                    killed += 1
+                    print('killed ', idx, killed)
+                try:
+                    client.incr('key', 1)
+                except:
+                    pass  # mimic err handling
+            self.assertTrue('All clients are down.' in str(context.exception))
+
+        assert idx == 8  # the next iteration after the last client was killed
+
+        # restart all the instances
+        for instance, port in enumerate(range(10101, 10104)):
+            self.instances[instance] = RedisInstance(port)
