@@ -33,8 +33,6 @@ class FlusterClusterTests(unittest.TestCase):
         self.cluster = FlusterCluster([i.conn for i in self.instances],
                                       penalty_box_min_wait=0.5)
         self.keys = ['hi', 'redis', 'test']  # hashes to 3 separate values
-        self.requester1 = "hashablething"
-        self.requester2 = "anotherhashablething"
 
     def tearDown(self):
         for instance in self.instances:
@@ -97,69 +95,6 @@ class FlusterClusterTests(unittest.TestCase):
         finally:
             # Bring it back up
             self.instances[0] = RedisInstance(10101)
-
-    def test_cycle_clients(self):
-        # should cycle through clients the given number of times
-        desired_cycles = 2
-        counter = 0
-        returned_clients = set()
-        for client in self.cluster.get_client_cycle(self.requester1, cycles=desired_cycles):
-            counter += 1
-            returned_clients.update([client])
-
-        assert counter == (desired_cycles * len(self.cluster.active_clients))
-        assert len(returned_clients) == len(self.cluster.active_clients)
-
-    def test_cycle_clients_with_failures(self):
-        # should not include inactive nodes
-        self.instances[0].terminate()
-
-        counter = 0
-        for client in self.cluster.get_client_cycle(self.requester1):
-            try:
-                client.incr('key', 1)
-                counter += 1
-            except:
-                continue  # exception handled by the cluster
-
-        # Restart instance
-        self.instances[0] = RedisInstance(10101)
-        time.sleep(0.5)
-
-        assert counter == 2
-        assert counter == len(self.cluster.active_clients)
-        assert counter == len(self.cluster.initial_clients.values()) - 1
-
-        # should add restarted nodes back to the list after reported failure
-        counter = 0
-        for client in self.cluster.get_client_cycle(self.requester1):
-            client.incr('key', 1)
-            counter += 1
-
-        assert counter == len(self.cluster.active_clients)
-        assert counter == 3  # to verify it added the node back
-
-    def test_cycle_clients_tracking(self):
-        # should track separate cycle entry points for each requester
-        client1 = client2 = None
-        for counter, client in enumerate(self.cluster.get_client_cycle(self.requester1)):
-            if counter == 0:
-                client1 = client
-                break
-
-        for counter, client in enumerate(self.cluster.get_client_cycle(self.requester2)):
-            if counter == 0:
-                # make sure it counts from the beginning
-                assert client == client1
-
-            elif counter == 1:
-                client2 = client
-
-        # self.requester1 should pick up where it left off
-        for counter, client in enumerate(self.cluster.get_client_cycle(self.requester1)):
-            if counter == 0:
-                assert client == client2
-                break
 
     def test_zrevrange(self):
         """Add a sorted set, turn off the client, add to the set,

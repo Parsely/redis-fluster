@@ -9,6 +9,7 @@ from redis.exceptions import ConnectionError, TimeoutError
 
 from .exceptions import ClusterEmptyError
 from .penalty_box import PenaltyBox
+from .utils import ActiveClientCycle
 
 log = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class FlusterCluster(object):
         self.initial_clients = {c.pool_id: c for c in clients}
         self._sort_clients()
         # maintain separate cycle trackers for each requester
-        self._requester_cycles = {}
+        #self._requester_cycles = {}
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
@@ -132,7 +133,7 @@ class FlusterCluster(object):
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
 
-    def get_client_cycle(self, requester, cycles=1):
+    def get_active_client_cycle(self, rounds=1):
         """Yield clients, maintaining separate cycles for each requester.
 
         Will not generate the same client more than `cycles` times,
@@ -141,29 +142,8 @@ class FlusterCluster(object):
         :param requester: Hashable key for each requesting object.
         :param cycles: Max times to return each client per call.
         """
-        if requester not in self._requester_cycles:
-            self._requester_cycles[requester] = cycle(self.initial_clients.values())
+        return ActiveClientCycle(self, rounds=rounds)
 
-        self._prune_penalty_box()
-
-        if len(self.active_clients) == 0:
-            raise ClusterEmptyError('All clients are down.')
-
-        conn_cycle = self._requester_cycles[requester]
-        placemarker = None
-        rounds = 0
-        for next_client in conn_cycle:
-            # either we've just started, or we completed a cycle
-            if not placemarker:
-                placemarker = next_client
-            elif next_client == placemarker:
-                rounds += 1
-
-            if rounds >= cycles:
-                raise StopIteration
-
-            if next_client in self.active_clients:
-                yield next_client
 
     def _penalize_client(self, client):
         """Place client in the penalty box.
