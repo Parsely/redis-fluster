@@ -41,8 +41,6 @@ class FlusterCluster(object):
         self.active_clients = self._prep_clients(clients)
         self.initial_clients = {c.pool_id: c for c in clients}
         self._sort_clients()
-        # maintain separate cycle trackers for each requester
-        #self._requester_cycles = {}
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
@@ -134,16 +132,11 @@ class FlusterCluster(object):
             return self.active_clients[pos]
 
     def get_active_client_cycle(self, rounds=1):
-        """Yield clients, maintaining separate cycles for each requester.
+        """Create an ActiveClientCycle using this cluster.
 
-        Will not generate the same client more than `cycles` times,
-        per use of the function. Also handles down nodes.
-
-        :param requester: Hashable key for each requesting object.
-        :param cycles: Max times to return each client per call.
+        :param rounds: max number of times to see each client per call to __iter__
         """
         return ActiveClientCycle(self, rounds=rounds)
-
 
     def _penalize_client(self, client):
         """Place client in the penalty box.

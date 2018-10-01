@@ -6,11 +6,11 @@ from .exceptions import ClusterEmptyError
 class ActiveClientCycle(object):
     """Tracks last returned client, will not iterate more than `rounds` times.
 
-    Useful when you need to evenly cycle through active connections to check
-    each once for work.
+    Useful when you need to evenly cycle through active connections, skipping
+    dead ones.
 
     Each user of the class should instantiate a separate object to correctly track
-    the last requested client for that requester.
+    the last requested client for that user.
     """
     def __init__(self, cluster, rounds=1):
         self.cluster = cluster
@@ -26,16 +26,17 @@ class ActiveClientCycle(object):
         """Restarts the `rounds` tracker, and updates active clients."""
         self.round_start = None
         self.rounds_completed = 0
-
-        self.cluster._prune_penalty_box()  # XX TODO make public
+        self.cluster._prune_penalty_box()
 
         return self
 
     def __next__(self):
         """Always returns a client, or raises an Exception if none are available."""
+        # raise Exception if no clients are available
         if len(self.cluster.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
 
+        # always return something
         nxt = None
         while nxt is None:
             nxt = self._next_helper()
@@ -57,6 +58,6 @@ class ActiveClientCycle(object):
         if self.rounds_completed >= self.round_limit:
             raise StopIteration
 
-        # check active clients
+        # only return active connections
         if curr in self.cluster.active_clients:
             return curr
