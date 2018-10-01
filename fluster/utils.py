@@ -43,6 +43,9 @@ class ActiveClientCycle(object):
 
         return nxt
 
+    def next(self):
+        return self.__next__()
+
     def _next_helper(self):
         """Returns an active connection, unless this iterable has already cycled
         through too many times.
