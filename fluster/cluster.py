@@ -131,12 +131,10 @@ class FlusterCluster(object):
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
 
-    def get_active_client_cycle(self, rounds=1):
+    def get_active_client_cycle(self):
         """Create an ActiveClientCycle using this cluster.
-
-        :param rounds: max number of times to see each client per call to __iter__
         """
-        return ActiveClientCycle(self, rounds=rounds)
+        return ActiveClientCycle(self)
 
     def _penalize_client(self, client):
         """Place client in the penalty box.

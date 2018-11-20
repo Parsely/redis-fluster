@@ -38,29 +38,30 @@ class FlusterClusterTests(unittest.TestCase):
                 delattr(instance.conn, 'pool_id')
 
     def test_cycle_clients(self):
-        # should cycle through clients the given number of times
-        desired_rounds = 2
+        # should cycle through clients indefinately
         returned_clients = set()
-        active_clients_cycle = self.cluster.get_active_client_cycle(rounds=desired_rounds)
+        limit = 15
+        active_clients_cycle = self.cluster.get_active_client_cycle()
 
         assert True
 
         for idx, client in enumerate(active_clients_cycle):
             returned_clients.update([client])
             assert client is not None
+            if idx >= limit:
+                break
 
-        assert (idx + 1) == (desired_rounds * len(self.cluster.active_clients))
+        assert idx == 15
         assert len(returned_clients) == len(self.cluster.active_clients)
 
     def test_cycle_clients_with_failures(self):
         # should not include inactive nodes
         self.instances[0].terminate()
-
-        desired_rounds = 2
+        limit = 6  # normally two rounds, but with 2 nodes, 3 rounds
         counter = 0
-        active_clients_cycle = self.cluster.get_active_client_cycle(rounds=desired_rounds)
+        active_clients_cycle = self.cluster.get_active_client_cycle()
 
-        for client in active_clients_cycle:
+        for idx, client in enumerate(active_clients_cycle):
             assert client is not None
             try:
                 client.incr('key', 1)
@@ -68,29 +69,33 @@ class FlusterClusterTests(unittest.TestCase):
             except Exception as e:
                 print("oops", client, e)
                 continue  # exception handled by the cluster
+            if idx >= limit:
+                break
 
         # Restart instance
         self.instances[0] = RedisInstance(10101)
         time.sleep(0.5)
 
-        assert counter == 4  # 2 rounds, 2 working clients each round
+        assert counter == 6  # able to continue even when node is down
         assert 2 == len(self.cluster.active_clients)
         assert 2 == len(self.cluster.initial_clients.values()) - 1
 
         # should add restarted nodes back to the list after reported failure
         # calling __iter__ again checks the penalty box
         counter = 0
-        for client in active_clients_cycle:
+        for idx, client in enumerate(active_clients_cycle):
+            if idx >= limit:
+                break
             client.incr('key', 1)
             counter += 1
 
-        assert counter == len(self.cluster.active_clients) * desired_rounds
+        assert counter == limit
         assert len(self.cluster.active_clients) == 3  # to verify it added the node back
 
     def test_cycle_clients_tracking(self):
         # should track separate cycle entry points for each instance
-        active_cycle_1 = self.cluster.get_active_client_cycle(rounds=1)
-        active_cycle_2 = self.cluster.get_active_client_cycle(rounds=1)
+        active_cycle_1 = self.cluster.get_active_client_cycle()
+        active_cycle_2 = self.cluster.get_active_client_cycle()
 
         # advance cycle 1
         next(active_cycle_1)
@@ -101,7 +106,8 @@ class FlusterClusterTests(unittest.TestCase):
     def test_dropped_connections_while_iterating(self):
         # dropped connections in the middle of an iteration should not cause an infinite loop
         # and should raise an exception
-        active_cycle = self.cluster.get_active_client_cycle(rounds=7)
+        limit = 21
+        active_cycle = self.cluster.get_active_client_cycle()
 
         assert len(self.cluster.active_clients) == 3
 
@@ -109,6 +115,8 @@ class FlusterClusterTests(unittest.TestCase):
         killed = 0
         with self.assertRaises(ClusterEmptyError) as context:
             for idx, client in enumerate(active_cycle):
+                if idx >= limit:
+                    break  # in case the test fails to stop
                 if idx in drop_at_idx:
                     self.instances[killed].terminate()
                     killed += 1

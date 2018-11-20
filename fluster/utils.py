@@ -12,20 +12,12 @@ class ActiveClientCycle(object):
     Each user of the class should instantiate a separate object to correctly track
     the last requested client for that user.
     """
-    def __init__(self, cluster, rounds=1):
+    def __init__(self, cluster):
         self.cluster = cluster
-        self.round_limit = rounds
         self.clients = cycle(cluster.initial_clients.values())
-
-        self._init_round_trackers()
-
-    def _init_round_trackers(self):
-        self.round_start = None
-        self.rounds_completed = 0
 
     def __iter__(self):
         """Restarts the `rounds` tracker, and updates active clients."""
-        self._init_round_trackers()
         self.cluster._prune_penalty_box()
 
         return self
@@ -51,15 +43,6 @@ class ActiveClientCycle(object):
         through too many times.
         """
         curr = next(self.clients)
-
-        # manage round counting
-        if not self.round_start:
-            self.round_start = curr
-        elif self.round_start == curr:
-            self.rounds_completed += 1
-
-        if self.rounds_completed >= self.round_limit:
-            raise StopIteration
 
         # only return active connections
         if curr in self.cluster.active_clients:
