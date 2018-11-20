@@ -3,6 +3,23 @@ from itertools import cycle
 from .exceptions import ClusterEmptyError
 
 
+def round_controlled(iterable, rounds=1):
+    """Raise StopIteration after <rounds> passes through iterable."""
+    round_start = None
+    rounds_completed = 0
+
+    for item in iterable:
+        if not round_start:
+            round_start = item
+        elif item == round_start:
+            rounds_completed += 1
+
+        if rounds_completed == rounds:
+            raise StopIteration
+
+        yield item
+
+
 class ActiveClientCycle(object):
     """Tracks last returned client, will not iterate more than `rounds` times.
 

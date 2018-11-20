@@ -5,7 +5,7 @@ import sys
 
 from testinstances import RedisInstance
 
-from fluster import FlusterCluster, ClusterEmptyError
+from fluster import FlusterCluster, ClusterEmptyError, round_controlled
 
 
 class FlusterClusterTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class FlusterClusterTests(unittest.TestCase):
     def test_cycle_clients_with_failures(self):
         # should not include inactive nodes
         self.instances[0].terminate()
-        limit = 6  # normally two rounds, but with 2 nodes, 3 rounds
+        limit = 6
         counter = 0
         active_clients_cycle = self.cluster.get_active_client_cycle()
 
@@ -132,3 +132,23 @@ class FlusterClusterTests(unittest.TestCase):
         # restart all the instances
         for instance, port in enumerate(range(10101, 10104)):
             self.instances[instance] = RedisInstance(port)
+
+    def test_round_controller(self):
+        # the round controller should track rounds and limit iterations
+        repeated_sublist = list(range(0, 3))
+        lis = repeated_sublist * 5
+        desired_rounds = 4  # don't iterate through the whole list
+        for idx, item in enumerate(round_controlled(lis, rounds=desired_rounds)):
+            pass
+
+        assert idx == desired_rounds * len(repeated_sublist)
+
+        # more specific application
+        active_cycle = self.cluster.get_active_client_cycle()
+        desired_rounds = 3
+
+        for idx, conn in enumerate(round_controlled(active_cycle, rounds=desired_rounds)):
+            pass
+
+        # should raise stopiteration at appropriate time
+        assert idx == (desired_rounds * len(self.cluster.active_clients)) - 1
