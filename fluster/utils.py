@@ -3,13 +3,13 @@ from itertools import cycle
 from .exceptions import ClusterEmptyError
 
 
-def round_controlled(iterable, rounds=1):
-    """Raise StopIteration after <rounds> passes through iterable."""
+def round_controlled(cycled_iterable, rounds=1):
+    """Raise StopIteration after <rounds> passes through a cycled iterable."""
     round_start = None
     rounds_completed = 0
 
-    for item in iterable:
-        if not round_start:
+    for item in cycled_iterable:
+        if round_start is None:
             round_start = item
         elif item == round_start:
             rounds_completed += 1
@@ -21,7 +21,7 @@ def round_controlled(iterable, rounds=1):
 
 
 class ActiveClientCycle(object):
-    """Tracks last returned client, will not iterate more than `rounds` times.
+    """Only returns active clients.
 
     Useful when you need to evenly cycle through active connections, skipping
     dead ones.
@@ -53,11 +53,11 @@ class ActiveClientCycle(object):
         return nxt
 
     def next(self):
+        """Python 2/3 compatibility."""
         return self.__next__()
 
     def _next_helper(self):
-        """Returns an active connection, unless this iterable has already cycled
-        through too many times.
+        """Helper that only returns an active connection.
         """
         curr = next(self.clients)
 
