@@ -23,6 +23,9 @@ class FlusterCluster(object):
 
     Ideal cases for this are things like caches, where another copy of data
     isn't a huge problem (provided expiries are respected).
+
+    The FlusterCluster instance can be iterated through, and only active
+    connections will be returned.
     """
 
     @classmethod
@@ -41,11 +44,13 @@ class FlusterCluster(object):
         self.initial_clients = {c.pool_id: c for c in clients}
         self.clients = cycle(self.initial_clients.values())
         self._sort_clients()
+        # maintenance work is done each "tick" when iterating
+        self._tick_interval = 2 * len(clients)
+        self._ticks = 0
 
     def __iter__(self):
-        """Restarts the `rounds` tracker, and updates active clients."""
+        """Updates active clients each time it's iterated through."""
         self._prune_penalty_box()
-
         return self
 
     def __next__(self):
@@ -59,7 +64,15 @@ class FlusterCluster(object):
         while nxt is None:
             nxt = self._next_helper()
 
+        self._ticks += 1
+        if self._ticks == self._tick_interval:
+            self._tick()
         return nxt
+
+    def _tick(self):
+        """Called every self._tick_interval iterations to do maintenance work."""
+        self._prune_penalty_box()
+        self._ticks = 0
 
     def next(self):
         """Python 2/3 compatibility."""
