@@ -141,7 +141,7 @@ class FlusterClusterTests(unittest.TestCase):
         for idx, item in enumerate(round_controlled(lis, rounds=desired_rounds)):
             pass
 
-        assert idx == desired_rounds * len(repeated_sublist)
+        assert idx == desired_rounds * len(repeated_sublist) - 1
 
         # more specific application
         active_cycle = self.cluster.get_active_client_cycle()
@@ -151,4 +151,4 @@ class FlusterClusterTests(unittest.TestCase):
             pass
 
         # should raise stopiteration at appropriate time
-        assert idx == (desired_rounds * len(self.cluster.active_clients)) - 1
+        assert idx == (desired_rounds * len(self.cluster.active_clients) - 1)
