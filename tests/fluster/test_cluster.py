@@ -227,7 +227,7 @@ class FlusterClusterTests(unittest.TestCase):
         key = 'foo'
         for element, count in zip(self.keys, (1.0, 2.0, 3.0)):
             client = self.cluster.get_client(element)
-            client.zadd(key, count, element)
+            client.zadd(key, {element: count})
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
         self.assertEqual(set([3, 2]), set(revrange.values()))
 
@@ -238,12 +238,12 @@ class FlusterClusterTests(unittest.TestCase):
         new_count = 5
         client = self.cluster.get_client(dropped_element)
         try:
-            client.zadd(key, new_count, dropped_element)
+            client.zadd(key, {dropped_element: new_count})
             raise Exception("Should not get here, client was terminated")
         except ConnectionError:
             client = self.cluster.get_client(dropped_element)
             print('replaced client', client)
-            client.zadd(key, new_count, dropped_element)
+            client.zadd(key, {dropped_element: new_count})
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
         self.assertEqual(set([new_count, 2]), set(revrange.values()))
 
@@ -255,6 +255,6 @@ class FlusterClusterTests(unittest.TestCase):
         self.assertEqual(set([new_count, 2]), set(revrange.values())) #restarted instance is empty in this case
 
         client = self.cluster.get_client(dropped_element)
-        client.zadd(key, 3, dropped_element) #put original value back in
+        client.zadd(key, {dropped_element: 3}) #put original value back in
         revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
         self.assertEqual(set([new_count, 2]), set(revrange.values())) #max value found for duplicates is returned
