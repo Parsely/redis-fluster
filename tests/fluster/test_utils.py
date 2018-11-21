@@ -4,12 +4,11 @@ import unittest
 import sys
 
 from testinstances import RedisInstance
-
 from fluster import FlusterCluster, ClusterEmptyError, round_controlled
+import redis
 
 
 class FlusterClusterTests(unittest.TestCase):
-
     def assertCountEqual(self, a, b):
         if sys.version_info > (3, 0):
             super(FlusterClusterTests, self).assertCountEqual(a, b)
@@ -41,11 +40,10 @@ class FlusterClusterTests(unittest.TestCase):
         # should cycle through clients indefinately
         returned_clients = set()
         limit = 15
-        active_clients_cycle = self.cluster.get_active_client_cycle()
 
         assert True
 
-        for idx, client in enumerate(active_clients_cycle):
+        for idx, client in enumerate(self.cluster):
             returned_clients.update([client])
             assert client is not None
             if idx >= limit:
@@ -59,9 +57,8 @@ class FlusterClusterTests(unittest.TestCase):
         self.instances[0].terminate()
         limit = 6
         counter = 0
-        active_clients_cycle = self.cluster.get_active_client_cycle()
 
-        for idx, client in enumerate(active_clients_cycle):
+        for idx, client in enumerate(self.cluster):
             assert client is not None
             try:
                 client.incr('key', 1)
@@ -83,7 +80,7 @@ class FlusterClusterTests(unittest.TestCase):
         # should add restarted nodes back to the list after reported failure
         # calling __iter__ again checks the penalty box
         counter = 0
-        for idx, client in enumerate(active_clients_cycle):
+        for idx, client in enumerate(self.cluster):
             if idx >= limit:
                 break
             client.incr('key', 1)
@@ -94,27 +91,34 @@ class FlusterClusterTests(unittest.TestCase):
 
     def test_cycle_clients_tracking(self):
         # should track separate cycle entry points for each instance
-        active_cycle_1 = self.cluster.get_active_client_cycle()
-        active_cycle_2 = self.cluster.get_active_client_cycle()
+        cluster_instance_1 = self.cluster
+        # connect to already-running testinstances, instead of making more,
+        # to mimic two FlusterCluster instances
+        redis_clients = [redis.StrictRedis(port=conn.port)
+                         for conn in self.instances]
+        cluster_instance_2 = FlusterCluster([i for i in redis_clients],
+                                            penalty_box_min_wait=0.5)
 
-        # advance cycle 1
-        next(active_cycle_1)
+        # advance cluster instance one
+        next(cluster_instance_1)
 
         # should not start at the same point
-        assert next(active_cycle_1) != next(active_cycle_2)
+        assert next(cluster_instance_1) != next(cluster_instance_2)
+
+        for temp_conn in redis_clients:
+            del temp_conn
 
     def test_dropped_connections_while_iterating(self):
         # dropped connections in the middle of an iteration should not cause an infinite loop
         # and should raise an exception
         limit = 21
-        active_cycle = self.cluster.get_active_client_cycle()
 
         assert len(self.cluster.active_clients) == 3
 
         drop_at_idx = (5, 6, 7)  # at these points, kill a connection
         killed = 0
         with self.assertRaises(ClusterEmptyError) as context:
-            for idx, client in enumerate(active_cycle):
+            for idx, client in enumerate(self.cluster):
                 if idx >= limit:
                     break  # in case the test fails to stop
                 if idx in drop_at_idx:
@@ -144,10 +148,9 @@ class FlusterClusterTests(unittest.TestCase):
         assert idx == desired_rounds * len(repeated_sublist) - 1
 
         # more specific application
-        active_cycle = self.cluster.get_active_client_cycle()
         desired_rounds = 3
 
-        for idx, conn in enumerate(round_controlled(active_cycle, rounds=desired_rounds)):
+        for idx, conn in enumerate(round_controlled(self.cluster, rounds=desired_rounds)):
             pass
 
         # should raise stopiteration at appropriate time

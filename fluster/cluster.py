@@ -9,7 +9,6 @@ from redis.exceptions import ConnectionError, TimeoutError
 
 from .exceptions import ClusterEmptyError
 from .penalty_box import PenaltyBox
-from .utils import ActiveClientCycle
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +39,40 @@ class FlusterCluster(object):
                                       multiplier=penalty_box_wait_multiplier)
         self.active_clients = self._prep_clients(clients)
         self.initial_clients = {c.pool_id: c for c in clients}
+        self.clients = cycle(self.initial_clients.values())
         self._sort_clients()
+
+    def __iter__(self):
+        """Restarts the `rounds` tracker, and updates active clients."""
+        self._prune_penalty_box()
+
+        return self
+
+    def __next__(self):
+        """Always returns a client, or raises an Exception if none are available."""
+        # raise Exception if no clients are available
+        if len(self.active_clients) == 0:
+            raise ClusterEmptyError('All clients are down.')
+
+        # always return something
+        nxt = None
+        while nxt is None:
+            nxt = self._next_helper()
+
+        return nxt
+
+    def next(self):
+        """Python 2/3 compatibility."""
+        return self.__next__()
+
+    def _next_helper(self):
+        """Helper that only returns an active connection.
+        """
+        curr = next(self.clients)
+
+        # only return active connections
+        if curr in self.active_clients:
+            return curr
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
@@ -130,11 +162,6 @@ class FlusterCluster(object):
         else:
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
-
-    def get_active_client_cycle(self):
-        """Create an ActiveClientCycle using this cluster.
-        """
-        return ActiveClientCycle(self)
 
     def _penalize_client(self, client):
         """Place client in the penalty box.
