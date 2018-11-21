@@ -7,7 +7,8 @@ import sys
 from redis.exceptions import ConnectionError
 from testinstances import RedisInstance
 
-from fluster import FlusterCluster
+from fluster import FlusterCluster, ClusterEmptyError
+import redis
 
 
 class FlusterClusterTests(unittest.TestCase):
@@ -95,6 +96,129 @@ class FlusterClusterTests(unittest.TestCase):
         finally:
             # Bring it back up
             self.instances[0] = RedisInstance(10101)
+
+    def test_cycle_clients(self):
+        # should cycle through clients indefinately
+        returned_clients = set()
+        limit = 15
+
+        assert True
+
+        for idx, client in enumerate(self.cluster):
+            returned_clients.update([client])
+            assert client is not None
+            if idx >= limit:
+                break
+
+        assert idx == 15
+        assert len(returned_clients) == len(self.cluster.active_clients)
+
+    def test_cycle_clients_with_failures(self):
+        # should not include inactive nodes
+        self.instances[0].terminate()
+        limit = 6
+        counter = 0
+
+        for idx, client in enumerate(self.cluster):
+            assert client is not None
+            try:
+                client.incr('key', 1)
+                counter += 1
+            except Exception as e:
+                print("oops", client, e)
+                continue  # exception handled by the cluster
+            if idx >= limit:
+                break
+
+        # Restart instance
+        self.instances[0] = RedisInstance(10101)
+        time.sleep(0.5)
+
+        assert counter == 6  # able to continue even when node is down
+        assert 2 == len(self.cluster.active_clients)
+        assert 2 == len(self.cluster.initial_clients.values()) - 1
+
+        # should add restarted nodes back to the list after reported failure
+        # calling __iter__ again checks the penalty box
+        counter = 0
+        for idx, client in enumerate(self.cluster):
+            if idx >= limit:
+                break
+            client.incr('key', 1)
+            counter += 1
+
+        assert counter == limit
+        assert len(self.cluster.active_clients) == 3  # to verify it added the node back
+
+    def test_long_running_iterations(self):
+        # long-running iterations should still add connections back to the cluster
+        drop_client = 3
+        restart_client = 10
+        client_available = restart_client + (2 * 3)
+
+        for idx, client in enumerate(self.cluster):
+            # attempt to use each client
+            try:
+                client.incr('key', 1)
+            except Exception:
+                continue  # exception handled by the cluster
+            # mimic connection dropping out and returning
+            if idx == drop_client:
+                self.instances[0].terminate()
+            elif idx == restart_client:
+                self.instances[0] = RedisInstance(10101)
+            # client should be visible after the next _tick
+            elif idx == client_available:
+                assert len(self.cluster.active_clients) == 3
+                break
+
+    def test_cycle_clients_tracking(self):
+        # should track separate cycle entry points for each instance
+        cluster_instance_1 = self.cluster
+        # connect to already-running testinstances, instead of making more,
+        # to mimic two FlusterCluster instances
+        redis_clients = [redis.StrictRedis(port=conn.port)
+                         for conn in self.instances]
+        cluster_instance_2 = FlusterCluster([i for i in redis_clients],
+                                            penalty_box_min_wait=0.5)
+
+        # advance cluster instance one
+        next(cluster_instance_1)
+
+        # should not start at the same point
+        assert next(cluster_instance_1) != next(cluster_instance_2)
+
+        for temp_conn in redis_clients:
+            del temp_conn
+
+    def test_dropped_connections_while_iterating(self):
+        # dropped connections in the middle of an iteration should not cause an infinite loop
+        # and should raise an exception
+        limit = 21
+
+        assert len(self.cluster.active_clients) == 3
+
+        drop_at_idx = (5, 6, 7)  # at these points, kill a connection
+        killed = 0
+        with self.assertRaises(ClusterEmptyError) as context:
+            for idx, client in enumerate(self.cluster):
+                if idx >= limit:
+                    break  # in case the test fails to stop
+                if idx in drop_at_idx:
+                    self.instances[killed].terminate()
+                    killed += 1
+                    print('killed ', idx, killed)
+                try:
+                    client.incr('key', 1)
+                except:
+                    pass  # mimic err handling
+            self.assertTrue('All clients are down.' in str(context.exception))
+
+        assert idx == 8  # the next iteration after the last client was killed
+
+        # restart all the instances
+        for instance, port in enumerate(range(10101, 10104)):
+            self.instances[instance] = RedisInstance(port)
 
     def test_zrevrange(self):
         """Add a sorted set, turn off the client, add to the set,
