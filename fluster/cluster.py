@@ -59,15 +59,13 @@ class FlusterCluster(object):
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
 
-        # always return something
-        nxt = None
-        while nxt is None:
-            nxt = self._next_helper()
+        # refresh connections if they're back up
+        self._prune_penalty_box()
 
-        self._ticks += 1
-        if self._ticks == self._tick_interval:
-            self._tick()
-        return nxt
+        # return the first client that's active
+        for client in self.clients:
+            if client in self.active_clients:
+                return client
 
     def _tick(self):
         """Called every self._tick_interval iterations to do maintenance work."""
@@ -77,15 +75,6 @@ class FlusterCluster(object):
     def next(self):
         """Python 2/3 compatibility."""
         return self.__next__()
-
-    def _next_helper(self):
-        """Helper that only returns an active connection.
-        """
-        curr = next(self.clients)
-
-        # only return active connections
-        if curr in self.active_clients:
-            return curr
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
