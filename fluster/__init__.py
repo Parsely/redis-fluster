@@ -1,4 +1,4 @@
-__version__ = '0.0.5'
+__version__ = '0.1.0'
 
 from .utils import round_controlled
 from .cluster import FlusterCluster
