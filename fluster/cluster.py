@@ -44,9 +44,6 @@ class FlusterCluster(object):
         self.initial_clients = {c.pool_id: c for c in clients}
         self.clients = cycle(self.initial_clients.values())
         self._sort_clients()
-        # maintenance work is done each "tick" when iterating
-        self._tick_interval = 2 * len(clients)
-        self._ticks = 0
 
     def __iter__(self):
         """Updates active clients each time it's iterated through."""
@@ -66,11 +63,6 @@ class FlusterCluster(object):
         for client in self.clients:
             if client in self.active_clients:
                 return client
-
-    def _tick(self):
-        """Called every self._tick_interval iterations to do maintenance work."""
-        self._prune_penalty_box()
-        self._ticks = 0
 
     def next(self):
         """Python 2/3 compatibility."""

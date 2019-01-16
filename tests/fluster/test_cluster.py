@@ -154,7 +154,7 @@ class FlusterClusterTests(unittest.TestCase):
         # long-running iterations should still add connections back to the cluster
         drop_client = 3
         restart_client = 10
-        client_available = restart_client + (2 * 3)
+        client_available = restart_client + 1
 
         for idx, client in enumerate(self.cluster):
             # attempt to use each client
@@ -167,7 +167,7 @@ class FlusterClusterTests(unittest.TestCase):
                 self.instances[0].terminate()
             elif idx == restart_client:
                 self.instances[0] = RedisInstance(10101)
-            # client should be visible after the next _tick
+            # client should be visible after calling next() again
             elif idx == client_available:
                 assert len(self.cluster.active_clients) == 3
                 break
