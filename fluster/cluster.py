@@ -1,4 +1,5 @@
 from collections import defaultdict
+from itertools import cycle
 import functools
 import logging
 
@@ -22,6 +23,9 @@ class FlusterCluster(object):
 
     Ideal cases for this are things like caches, where another copy of data
     isn't a huge problem (provided expiries are respected).
+
+    The FlusterCluster instance can be iterated through, and only active
+    connections will be returned.
     """
 
     @classmethod
@@ -38,7 +42,31 @@ class FlusterCluster(object):
                                       multiplier=penalty_box_wait_multiplier)
         self.active_clients = self._prep_clients(clients)
         self.initial_clients = {c.pool_id: c for c in clients}
+        self.clients = cycle(self.initial_clients.values())
         self._sort_clients()
+
+    def __iter__(self):
+        """Updates active clients each time it's iterated through."""
+        self._prune_penalty_box()
+        return self
+
+    def __next__(self):
+        """Always returns a client, or raises an Exception if none are available."""
+        # raise Exception if no clients are available
+        if len(self.active_clients) == 0:
+            raise ClusterEmptyError('All clients are down.')
+
+        # refresh connections if they're back up
+        self._prune_penalty_box()
+
+        # return the first client that's active
+        for client in self.clients:
+            if client in self.active_clients:
+                return client
+
+    def next(self):
+        """Python 2/3 compatibility."""
+        return self.__next__()
 
     def _sort_clients(self):
         """Make sure clients are sorted consistently for consistent results."""
@@ -73,10 +101,7 @@ class FlusterCluster(object):
                 try:
                     return fn(*args, **kwargs)
                 except (ConnectionError, TimeoutError):  # TO THE PENALTY BOX!
-                    if client in self.active_clients:  # hasn't been removed yet
-                        log.warning('%r marked down.', client)
-                        self.active_clients.remove(client)
-                        self.penalty_box.add(client)
+                    self._penalize_client(client)
                     raise
             return functools.update_wrapper(wrapper, fn)
 
@@ -92,11 +117,10 @@ class FlusterCluster(object):
             log.debug('Wrapping %s', name)
             setattr(client, name, wrap(obj))
 
-    def get_client(self, shard_key):
-        """Get the client for a given shard, based on what's available.
+    def _prune_penalty_box(self):
+        """Restores clients that have reconnected.
 
-        If the proper client isn't available, the next available client
-        is returned. If no clients are available, an exception is raised.
+        This function should be called first for every public method.
         """
         added = False
         for client in self.penalty_box.get():
@@ -105,6 +129,14 @@ class FlusterCluster(object):
             added = True
         if added:
             self._sort_clients()
+
+    def get_client(self, shard_key):
+        """Get the client for a given shard, based on what's available.
+
+        If the proper client isn't available, the next available client
+        is returned. If no clients are available, an exception is raised.
+        """
+        self._prune_penalty_box()
 
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
@@ -125,11 +157,25 @@ class FlusterCluster(object):
             pos = hashed % len(self.active_clients)
             return self.active_clients[pos]
 
+    def _penalize_client(self, client):
+        """Place client in the penalty box.
+
+        :param client: Client object
+        """
+        if client in self.active_clients:  # hasn't been removed yet
+            log.warning('%r marked down.', client)
+            self.active_clients.remove(client)
+            self.penalty_box.add(client)
+        else:
+            log.info("%r not in active client list.")
+
     def zrevrange_with_int_score(self, key, max_score, min_score):
         """Get the zrevrangebyscore across the cluster.
         Highest score for duplicate element is returned.
         A faster method should be written if scores are not needed.
         """
+        self._prune_penalty_box()
+
         if len(self.active_clients) == 0:
             raise ClusterEmptyError('All clients are down.')
 

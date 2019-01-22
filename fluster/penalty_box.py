@@ -35,12 +35,14 @@ class PenaltyBox(object):
         now = time.time()
         while self._clients and self._clients[0][0] < now:
             _, (client, last_wait) = heapq.heappop(self._clients)
+            connect_start = time.time()
             try:
                 client.echo('test')  # reconnected if this succeeds.
                 self._client_ids.remove(client.pool_id)
                 yield client
             except (ConnectionError, TimeoutError):
+                timer = time.time() - connect_start
                 wait = min(int(last_wait * self._multiplier), self._max_wait)
                 heapq.heappush(self._clients,
                                (time.time() + wait, (client, wait)))
-                log.info('%r is still down. Retrying in %ss.', client, wait)
+                log.info('%r is still down after a %s second attempt to connect. Retrying in %ss.', client, timer, wait)
