@@ -19,9 +19,9 @@ services:
 
 install:
   # Use latest pip so we get wheels to cache
-  - pip install --upgrade pip
-  - pip install -r requirements.txt
-  - pip install -r test-requirements.txt
+  - pip install --retries 3 --upgrade pip wheel
+  - pip install --retries 3 --upgrade --upgrade-strategy only-if-needed -r requirements.txt
+  - pip install --retries 3 --upgrade --upgrade-strategy only-if-needed -r test-requirements.txt
 
 script:
   - py.test -vv
