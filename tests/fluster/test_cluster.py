@@ -12,7 +12,6 @@ import redis
 
 
 class FlusterClusterTests(unittest.TestCase):
-
     def assertCountEqual(self, a, b):
         if sys.version_info > (3, 0):
             super(FlusterClusterTests, self).assertCountEqual(a, b)
@@ -21,9 +20,11 @@ class FlusterClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.instances = [RedisInstance(10101),
-                         RedisInstance(10102),
-                         RedisInstance(10103)]
+        cls.instances = [
+            RedisInstance(10101),
+            RedisInstance(10102),
+            RedisInstance(10103),
+        ]
 
     @classmethod
     def tearDownClass(cls):
@@ -31,14 +32,15 @@ class FlusterClusterTests(unittest.TestCase):
             instance.terminate()
 
     def setUp(self):
-        self.cluster = FlusterCluster([i.conn for i in self.instances],
-                                      penalty_box_min_wait=0.5)
-        self.keys = ['hi', 'redis', 'test']  # hashes to 3 separate values
+        self.cluster = FlusterCluster(
+            [i.conn for i in self.instances], penalty_box_min_wait=0.5
+        )
+        self.keys = ["hi", "redis", "test"]  # hashes to 3 separate values
 
     def tearDown(self):
         for instance in self.instances:
-            if hasattr(instance.conn, 'pool_id'):
-                delattr(instance.conn, 'pool_id')
+            if hasattr(instance.conn, "pool_id"):
+                delattr(instance.conn, "pool_id")
 
     def test_basic(self):
         clients = []
@@ -78,18 +80,18 @@ class FlusterClusterTests(unittest.TestCase):
             # Check values in all running instances
             res = [i.conn.get(key) for i in self.instances]
             if key == changed:
-                self.assertCountEqual(res, [None, b'1', b'1'])
+                self.assertCountEqual(res, [None, b"1", b"1"])
             else:
-                self.assertCountEqual(res, [None, None, b'3'])
+                self.assertCountEqual(res, [None, None, b"3"])
 
     def test_consistent_hashing(self):
-        key = 'foo'  # 2 with 3 clients, 0 with 2
+        key = "foo"  # 2 with 3 clients, 0 with 2
         client = self.cluster.get_client(key)
         self.instances[0].terminate()
         try:
             self.assertRaises(
                 ConnectionError,
-                lambda: self.cluster.get_client(self.keys[0]).incr('hi', 1)
+                lambda: self.cluster.get_client(self.keys[0]).incr("hi", 1),
             )
             client_2 = self.cluster.get_client(key)
             self.assertEqual(client, client_2)
@@ -122,7 +124,7 @@ class FlusterClusterTests(unittest.TestCase):
         for idx, client in enumerate(self.cluster):
             assert client is not None
             try:
-                client.incr('key', 1)
+                client.incr("key", 1)
                 counter += 1
             except Exception as e:
                 print("oops", client, e)
@@ -144,7 +146,7 @@ class FlusterClusterTests(unittest.TestCase):
         for idx, client in enumerate(self.cluster):
             if idx >= limit:
                 break
-            client.incr('key', 1)
+            client.incr("key", 1)
             counter += 1
 
         assert counter == limit
@@ -159,7 +161,7 @@ class FlusterClusterTests(unittest.TestCase):
         for idx, client in enumerate(self.cluster):
             # attempt to use each client
             try:
-                client.incr('key', 1)
+                client.incr("key", 1)
             except Exception:
                 continue  # exception handled by the cluster
             # mimic connection dropping out and returning
@@ -177,10 +179,10 @@ class FlusterClusterTests(unittest.TestCase):
         cluster_instance_1 = self.cluster
         # connect to already-running testinstances, instead of making more,
         # to mimic two FlusterCluster instances
-        redis_clients = [redis.StrictRedis(port=conn.port)
-                         for conn in self.instances]
-        cluster_instance_2 = FlusterCluster([i for i in redis_clients],
-                                            penalty_box_min_wait=0.5)
+        redis_clients = [redis.StrictRedis(port=conn.port) for conn in self.instances]
+        cluster_instance_2 = FlusterCluster(
+            [i for i in redis_clients], penalty_box_min_wait=0.5
+        )
 
         # advance cluster instance one
         next(cluster_instance_1)
@@ -207,12 +209,12 @@ class FlusterClusterTests(unittest.TestCase):
                 if idx in drop_at_idx:
                     self.instances[killed].terminate()
                     killed += 1
-                    print('killed ', idx, killed)
+                    print("killed ", idx, killed)
                 try:
-                    client.incr('key', 1)
+                    client.incr("key", 1)
                 except:
                     pass  # mimic err handling
-            self.assertTrue('All clients are down.' in str(context.exception))
+            self.assertTrue("All clients are down." in str(context.exception))
 
         assert idx == 8  # the next iteration after the last client was killed
 
@@ -224,11 +226,11 @@ class FlusterClusterTests(unittest.TestCase):
         """Add a sorted set, turn off the client, add to the set,
         turn the client back on, check results
         """
-        key = 'foo'
+        key = "foo"
         for element, count in zip(self.keys, (1.0, 2.0, 3.0)):
             client = self.cluster.get_client(element)
             client.zadd(key, {element: count})
-        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
+        revrange = self.cluster.zrevrange_with_int_score(key, "+inf", 2)
         self.assertEqual(set([3, 2]), set(revrange.values()))
 
         lost_client = self.cluster.get_client(self.keys[-1])
@@ -242,19 +244,23 @@ class FlusterClusterTests(unittest.TestCase):
             raise Exception("Should not get here, client was terminated")
         except ConnectionError:
             client = self.cluster.get_client(dropped_element)
-            print('replaced client', client)
+            print("replaced client", client)
             client.zadd(key, {dropped_element: new_count})
-        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
+        revrange = self.cluster.zrevrange_with_int_score(key, "+inf", 2)
         self.assertEqual(set([new_count, 2]), set(revrange.values()))
 
-        #turn it back on
+        # turn it back on
         self.instances[-1] = RedisInstance(10103)
         time.sleep(0.5)
 
-        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
-        self.assertEqual(set([new_count, 2]), set(revrange.values())) #restarted instance is empty in this case
+        revrange = self.cluster.zrevrange_with_int_score(key, "+inf", 2)
+        self.assertEqual(
+            set([new_count, 2]), set(revrange.values())
+        )  # restarted instance is empty in this case
 
         client = self.cluster.get_client(dropped_element)
-        client.zadd(key, {dropped_element: 3}) #put original value back in
-        revrange = self.cluster.zrevrange_with_int_score(key, '+inf', 2)
-        self.assertEqual(set([new_count, 2]), set(revrange.values())) #max value found for duplicates is returned
+        client.zadd(key, {dropped_element: 3})  # put original value back in
+        revrange = self.cluster.zrevrange_with_int_score(key, "+inf", 2)
+        self.assertEqual(
+            set([new_count, 2]), set(revrange.values())
+        )  # max value found for duplicates is returned

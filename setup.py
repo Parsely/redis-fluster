@@ -20,35 +20,32 @@ from setuptools import setup, find_packages
 
 # Get version without importing, which avoids dependency issues
 def get_version():
-    with open('fluster/__init__.py') as version_file:
-        return re.search(r"""__version__\s+=\s+(['"])(?P<version>.+?)\1""",
-                         version_file.read()).group('version')
+    with open("fluster/__init__.py") as version_file:
+        return re.search(
+            r"""__version__\s+=\s+(['"])(?P<version>.+?)\1""", version_file.read()
+        ).group("version")
 
 
 def readme():
-    ''' Returns README.rst contents as str '''
-    with open('README.rst') as f:
+    """ Returns README.rst contents as str """
+    with open("README.rst") as f:
         return f.read()
 
 
-install_requires = [
-    'mmh3',
-    'redis',
-    'hiredis',
-]
-tests_require = ['mock', 'pytest', 'testinstances']
-setup_requires = ['pytest-runner']
+install_requires = ["mmh3", "redis", "hiredis"]
+tests_require = ["mock", "pytest", "testinstances"]
+setup_requires = ["pytest-runner"]
 
 setup(
-    name='fluster',
+    name="fluster",
     version=get_version(),
-    author='Keith Bourgoin',
-    author_email='hello@parsely.com',
-    url='https://github.com/Parsely/redis-fluster',
-    description='Redis Cluster with Some Features',
+    author="Keith Bourgoin",
+    author_email="hello@parsely.com",
+    url="https://github.com/Parsely/redis-fluster",
+    description="Redis Cluster with Some Features",
     long_description=readme(),
-    keywords='redis cluster',
-    license='Apache License 2.0',
+    keywords="redis cluster",
+    license="Apache License 2.0",
     packages=find_packages(),
     install_requires=install_requires,
     tests_require=tests_require,
@@ -56,14 +53,14 @@ setup(
     zip_safe=True,
     include_package_data=True,
     classifiers=[
-            "Development Status :: 5 - Production/Stable",
-            "Intended Audience :: Developers",
-            "License :: OSI Approved :: Apache Software License",
-            "Programming Language :: Python",
-            "Programming Language :: Python :: 2",
-            "Programming Language :: Python :: 2.7",
-            "Topic :: Database",
-            "Topic :: Database :: Front-Ends",
-            "Topic :: Software Development :: Libraries :: Python Modules",
-        ]
+        "Development Status :: 5 - Production/Stable",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 2.7",
+        "Topic :: Database",
+        "Topic :: Database :: Front-Ends",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+    ],
 )

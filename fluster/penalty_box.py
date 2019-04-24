@@ -21,7 +21,7 @@ class PenaltyBox(object):
     def add(self, client):
         """Add a client to the penalty box."""
         if client.pool_id in self._client_ids:
-            log.info('%r is already in the penalty box. Ignoring.', client)
+            log.info("%r is already in the penalty box. Ignoring.", client)
             return
         release = time.time() + self._min_wait
         heapq.heappush(self._clients, (release, (client, self._min_wait)))
@@ -37,12 +37,16 @@ class PenaltyBox(object):
             _, (client, last_wait) = heapq.heappop(self._clients)
             connect_start = time.time()
             try:
-                client.echo('test')  # reconnected if this succeeds.
+                client.echo("test")  # reconnected if this succeeds.
                 self._client_ids.remove(client.pool_id)
                 yield client
             except (ConnectionError, TimeoutError):
                 timer = time.time() - connect_start
                 wait = min(int(last_wait * self._multiplier), self._max_wait)
-                heapq.heappush(self._clients,
-                               (time.time() + wait, (client, wait)))
-                log.info('%r is still down after a %s second attempt to connect. Retrying in %ss.', client, timer, wait)
+                heapq.heappush(self._clients, (time.time() + wait, (client, wait)))
+                log.info(
+                    "%r is still down after a %s second attempt to connect. Retrying in %ss.",
+                    client,
+                    timer,
+                    wait,
+                )

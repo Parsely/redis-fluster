@@ -15,9 +15,11 @@ class FlusterClusterTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.instances = [RedisInstance(10101),
-                         RedisInstance(10102),
-                         RedisInstance(10103)]
+        cls.instances = [
+            RedisInstance(10101),
+            RedisInstance(10102),
+            RedisInstance(10103),
+        ]
 
     @classmethod
     def tearDownClass(cls):
@@ -25,14 +27,15 @@ class FlusterClusterTests(unittest.TestCase):
             instance.terminate()
 
     def setUp(self):
-        self.cluster = FlusterCluster([i.conn for i in self.instances],
-                                      penalty_box_min_wait=0.5)
-        self.keys = ['hi', 'redis', 'test']  # hashes to 3 separate values
+        self.cluster = FlusterCluster(
+            [i.conn for i in self.instances], penalty_box_min_wait=0.5
+        )
+        self.keys = ["hi", "redis", "test"]  # hashes to 3 separate values
 
     def tearDown(self):
         for instance in self.instances:
-            if hasattr(instance.conn, 'pool_id'):
-                delattr(instance.conn, 'pool_id')
+            if hasattr(instance.conn, "pool_id"):
+                delattr(instance.conn, "pool_id")
 
     def test_round_controller(self):
         # the round controller should track rounds and limit iterations
@@ -47,7 +50,9 @@ class FlusterClusterTests(unittest.TestCase):
         # more specific application
         desired_rounds = 3
 
-        for idx, conn in enumerate(round_controlled(self.cluster, rounds=desired_rounds)):
+        for idx, conn in enumerate(
+            round_controlled(self.cluster, rounds=desired_rounds)
+        ):
             pass
 
         # should raise stopiteration at appropriate time
