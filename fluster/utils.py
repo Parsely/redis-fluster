@@ -1,5 +1,5 @@
 def round_controlled(cycled_iterable, rounds=1):
-    """Raise StopIteration after <rounds> passes through a cycled iterable."""
+    """Return after <rounds> passes through a cycled iterable."""
     round_start = None
     rounds_completed = 0
 
@@ -10,6 +10,6 @@ def round_controlled(cycled_iterable, rounds=1):
             rounds_completed += 1
 
         if rounds_completed == rounds:
-            raise StopIteration
+            return
 
         yield item
